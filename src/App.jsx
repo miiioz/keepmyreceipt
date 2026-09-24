@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Archive,
   CalendarClock,
   Camera,
   CheckCircle2,
+  Download,
   FileText,
+  HardDrive,
   Package,
   Pencil,
   Plus,
@@ -12,9 +14,16 @@ import {
   Search,
   ShieldCheck,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react'
-import { deletePurchase, getPurchases, savePurchase } from './storage'
+import {
+  deletePurchase,
+  exportBackupJson,
+  getPurchases,
+  importBackupJson,
+  savePurchase,
+} from './storage'
 
 const EMPTY_FORM = {
   itemName: '',
@@ -95,6 +104,23 @@ function getStatus(purchase) {
   return { tone: 'good', text: 'Covered' }
 }
 
+function ReceiptPreview({ blob, name }) {
+  const [url, setUrl] = useState('')
+
+  useEffect(() => {
+    if (!blob || !blob.type?.startsWith('image/')) {
+      setUrl('')
+      return undefined
+    }
+    const nextUrl = URL.createObjectURL(blob)
+    setUrl(nextUrl)
+    return () => URL.revokeObjectURL(nextUrl)
+  }, [blob])
+
+  if (!url) return null
+  return <img className="receipt-thumb" src={url} alt={name ? `Receipt: ${name}` : 'Receipt preview'} />
+}
+
 function PurchaseModal({ purchase, onClose, onSaved }) {
   const [form, setForm] = useState(() => ({ ...EMPTY_FORM, ...(purchase || {}) }))
   const [saving, setSaving] = useState(false)
@@ -128,7 +154,6 @@ function PurchaseModal({ purchase, onClose, onSaved }) {
   function handleReceipt(event) {
     const file = event.target.files?.[0]
     if (!file) return
-    update('receiptBlob', file)
     setForm((current) => ({
       ...current,
       receiptBlob: file,
@@ -246,10 +271,12 @@ function PurchaseModal({ purchase, onClose, onSaved }) {
                 className="file-input"
                 type="file"
                 accept="image/*,application/pdf"
+                capture="environment"
                 onChange={handleReceipt}
               />
               <div className="upload-box">
-                <Camera size={22} />
+                <ReceiptPreview blob={form.receiptBlob} name={form.receiptName} />
+                {!form.receiptBlob && <Camera size={22} />}
                 <div>
                   <strong>{form.receiptName || 'Upload or photograph receipt'}</strong>
                   <small>JPG, PNG or PDF. Stored only on this device.</small>
@@ -307,6 +334,12 @@ function PurchaseCard({ purchase, onEdit, onDelete }) {
         <strong>{purchase.amount !== '' ? formatMoney(purchase.amount, purchase.currency) : '—'}</strong>
       </div>
 
+      {purchase.receiptBlob?.type?.startsWith('image/') && (
+        <button className="receipt-preview-button" onClick={openReceipt} aria-label={`View receipt for ${purchase.itemName}`}>
+          <ReceiptPreview blob={purchase.receiptBlob} name={purchase.receiptName} />
+        </button>
+      )}
+
       <div className="card-dates">
         <div>
           <span>Purchased</span>
@@ -346,6 +379,7 @@ export default function App() {
   const [filter, setFilter] = useState('all')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState(null)
+  const restoreInputRef = useRef(null)
 
   async function refresh() {
     const records = await getPurchases()
@@ -404,6 +438,35 @@ export default function App() {
     await refresh()
   }
 
+  async function handleBackup() {
+    const json = await exportBackupJson()
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const date = new Date().toISOString().slice(0, 10)
+    link.href = url
+    link.download = `keepmyreceipt-backup-${date}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  async function handleRestore(event) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    try {
+      const count = await importBackupJson(await file.text())
+      await refresh()
+      window.alert(`Restored ${count} purchase${count === 1 ? '' : 's'}. Existing items with the same ID were updated.`)
+    } catch (error) {
+      window.alert(error?.message || 'Could not restore this backup.')
+    } finally {
+      event.target.value = ''
+    }
+  }
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -424,6 +487,23 @@ export default function App() {
           <button className="button primary hero-button" onClick={startAdd}>
             <Plus size={18} /> Add purchase
           </button>
+        </section>
+
+        <section className="local-notice">
+          <HardDrive size={20} />
+          <div>
+            <strong>Stored on this device</strong>
+            <span>Your purchases and receipt files stay in this browser. Clearing site data removes them, so export a backup occasionally.</span>
+          </div>
+          <div className="vault-tools">
+            <button className="button secondary compact" onClick={handleBackup} disabled={!purchases.length}>
+              <Download size={16} /> Backup
+            </button>
+            <button className="button secondary compact" onClick={() => restoreInputRef.current?.click()}>
+              <Upload size={16} /> Restore
+            </button>
+            <input ref={restoreInputRef} className="hidden-input" type="file" accept="application/json,.json" onChange={handleRestore} />
+          </div>
         </section>
 
         <section className="stats-grid">
@@ -493,7 +573,7 @@ export default function App() {
       </main>
 
       <footer>
-        <span>KeepMyReceipt · MVP 0.1</span>
+        <span>KeepMyReceipt · MVP 0.2</span>
         <span>Local-first · No account · No tracking</span>
       </footer>
 
