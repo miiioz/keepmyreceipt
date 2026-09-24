@@ -1,119 +1,90 @@
 # KeepMyReceipt — Project Notes
 
 ## Product idea
-A private-first purchase vault for receipts, return windows, warranties, serial numbers and later insurance/resale records.
+
+KeepMyReceipt is a low-contact, self-service consumer utility for storing proof of purchase and tracking return/warranty dates.
 
 Core promise:
 
 > Never lose a receipt or miss a warranty again.
 
-## Product principles
-- Privacy-first: purchase data should stay on-device by default.
-- Low-friction: adding a purchase should take under 30 seconds.
-- No account required for the free/local version.
-- Avoid subscription fatigue: local Pro features should favour one-time purchase; recurring fees should only fund recurring cloud services.
-- Self-service product with minimal support burden.
+## Current product direction
 
-## MVP 0.1 — current scope
-- Add purchase
-- Edit purchase
-- Delete purchase
-- Store item, retailer, category, price and currency
-- Purchase date
-- Return-window tracking
-- Warranty tracking
-- Serial number
-- Notes
-- Receipt image/PDF upload
-- Search
-- Filters for returns, warranties and expired coverage
-- Local IndexedDB storage
-- Responsive desktop/mobile UI
+- Mobile-first PWA, not a desktop dashboard.
+- Public app link, but user data remains local to each device.
+- No account or cloud database in the MVP.
+- Keep technical complexity low, consistent with `chuanma-scorer` and `med-tracker`.
+- Static app deployed from GitHub Pages `main` / `/root`.
+- IndexedDB is used instead of localStorage because receipt images/PDFs can be large.
 
-## Data/privacy architecture
-MVP stores all purchase records and receipt files in browser IndexedDB. There is currently:
-- no account
-- no analytics
-- no server database
-- no receipt upload API
+## MVP scope
 
-Important limitation: clearing browser/site storage can delete local records. Backup/export should be added before public launch.
+1. Add/edit/delete a purchase.
+2. Take/upload receipt image or PDF.
+3. Store item, retailer, price, currency and purchase date.
+4. Calculate return deadline from a return-window length.
+5. Calculate warranty expiry from warranty length.
+6. Save serial number and notes.
+7. Search/filter purchases.
+8. Show receipt previews.
+9. Export a complete JSON backup including receipt files.
+10. Restore a backup on the same or another device.
+11. Installable PWA and basic offline shell.
+
+## Privacy model
+
+- No server database.
+- No account.
+- No analytics/tracking in MVP.
+- Purchases and receipts stay in browser IndexedDB.
+- The public GitHub code repository does not contain user data.
+- Clearing browser/site data can delete local records, so backup is important.
 
 ## Monetisation hypothesis
+
+Do not add payments until the utility is validated through real use.
+
+Potential later model:
+
 ### Free
-- Up to 15 saved purchases
-- Manual entry
-- Basic return/warranty tracking
+- limited number of purchases
+- manual entry
+- basic reminders
 
-### Pro — target NZ$19.99 lifetime
-- Unlimited purchases
-- Receipt OCR / automatic extraction
-- Multiple/custom reminders
-- Serial-number search
-- Claim Pack PDF export
-- Backup/export
+### Pro — possible one-time purchase
+- unlimited purchases
+- smarter scanning/OCR
+- claim-pack PDF export
+- advanced reminders
 
-### Cloud — later optional annual plan
-Only if ongoing infrastructure is introduced:
+### Optional recurring service
+Only for features that create ongoing infrastructure cost:
 - encrypted sync
-- multi-device access
-- email receipt import
 - family sharing
+- email receipt import
+- cloud backup
 
-### Business — later
-Potential NZ$39/year tier for sole traders/small businesses:
-- equipment register
-- receipt archive
-- serial numbers
-- GST/export fields
-- insurance inventory/claim pack
+## Later opportunities
 
-## Roadmap
-### 0.2 — make it safe to rely on
-- JSON backup/export and import
-- Better date validation
-- Duplicate detection
-- Receipt thumbnail/preview
-- Installable PWA shell
+- on-device OCR
+- notifications
+- claim-pack PDF
+- insurance inventory
+- resale listing helper
+- encrypted optional sync
+- iOS/native wrapper only if PWA limitations become material
 
-### 0.3 — smart capture
-- On-device OCR where practical
-- Extract merchant/date/amount automatically
-- Suggested product name/category
-- Camera-first mobile capture flow
+## Non-goals for now
 
-### 0.4 — reminders
-- Browser/device notification support where available
-- Configurable reminder lead time
-- Return deadline and warranty expiry timeline
+- no complex authentication
+- no cloud backend
+- no subscription billing
+- no ads
+- no selling purchase data
+- no large AI feature set before usage validation
 
-### 0.5 — paid-value features
-- Claim Pack PDF
-- Unlimited-item entitlement
-- Resale record/export
-- Product ownership timeline
+## Architecture decision — 24 Sep 2026
 
-## Deployment
-Recommended first deployment: Cloudflare Pages.
+The initial prototype used React + Vite. It was simplified to a static PWA after comparing it with `chuanma-scorer` and `med-tracker`.
 
-Build command:
-
-```bash
-npm run build
-```
-
-Output directory:
-
-```text
-dist
-```
-
-## Do not build yet
-Avoid expanding into these until the MVP is validated:
-- full budgeting
-- retailer price comparison
-- marketplace listings
-- cloud accounts
-- team collaboration
-- AI chat assistant
-- complex inventory management
+Reason: the first version does not need a framework. Static HTML/CSS/JS is easier to deploy, inspect and maintain, and supports `main` / `/root` GitHub Pages hosting directly.

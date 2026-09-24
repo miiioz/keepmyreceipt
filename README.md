@@ -1,62 +1,52 @@
 # KeepMyReceipt
 
-Private-first receipt, warranty and purchase tracker.
+A private-first receipt, return-window and warranty tracker designed as a small mobile PWA.
 
 > Never lose a receipt or miss a warranty again.
 
-## First MVP
-KeepMyReceipt is a local-first installable web app. The app itself can be publicly hosted, while each user's purchase records and receipt files stay inside that user's browser using IndexedDB.
+## Current architecture
 
-Current features:
-- add, edit and delete purchases
-- photograph or upload receipt images/PDFs
-- receipt image previews
-- track purchase price, currency and retailer
-- calculate return deadlines
-- calculate warranty expiry
-- save serial numbers and notes
-- search and filter purchases
-- export a complete JSON backup, including receipt files
-- restore a KeepMyReceipt JSON backup on another browser/device
-- installable PWA metadata and offline service worker
-- responsive mobile/desktop interface
-- no account, analytics or server database
+KeepMyReceipt intentionally uses the same lightweight approach as the user's other small tools:
 
-## Public-link architecture
-The intended first deployment mirrors the simple Chuanma setup:
+- static HTML/CSS/JavaScript
+- no React or build step
+- deployed directly from GitHub Pages (`main` / `/root`)
+- installable PWA
+- IndexedDB for local purchase records and receipt files
+- no account, tracking, analytics or server database
 
-1. GitHub hosts the public app code.
-2. GitHub Pages serves the app at `https://miiioz.github.io/keepmyreceipt/`.
-3. IndexedDB stores each user's private data locally on their own device.
-4. Backup/Restore is used to move data between devices or protect against browser-data deletion.
+## MVP features
 
-A public repo/public web link does **not** publish the user's purchase or receipt data.
-
-## Run locally
-
-```bash
-npm install
-npm run dev
-```
-
-## Build
-
-```bash
-npm run build
-```
-
-The production output is written to `dist/`.
+- mobile-first app interface
+- take a photo or upload a receipt/PDF
+- add/edit/delete purchases
+- purchase price, retailer, category and serial number
+- automatic return deadline
+- automatic warranty expiry
+- receipt image preview
+- search and filters
+- local IndexedDB storage
+- JSON backup/restore including receipt files
+- offline shell via service worker
 
 ## GitHub Pages
-A Pages deployment workflow is included at `.github/workflows/pages.yml`. The Vite base path is already configured for `/keepmyreceipt/`.
 
-Before first deployment:
-- make the repository public (or use a GitHub plan that supports Pages for private repositories)
-- enable GitHub Pages with **GitHub Actions** as the source
-- run/re-run the **Deploy Pages** workflow
+Use:
 
-## Privacy and backup
-MVP data stays in the browser on the current device. Clearing site/browser storage can delete records. Use **Backup** to export a JSON file periodically. The backup contains the purchase records and embedded receipt files, so keep it somewhere private.
+- **Source:** Deploy from a branch
+- **Branch:** `main`
+- **Folder:** `/ (root)`
 
-## Product roadmap
-See [`PROJECT_NOTES.md`](./PROJECT_NOTES.md) for scope, monetisation assumptions and next milestones.
+The public app URL is:
+
+`https://miiioz.github.io/keepmyreceipt/`
+
+## Privacy
+
+Purchase records and receipt files stay in the browser on the current device. A public GitHub repository or public app URL does **not** publish user purchase data.
+
+Clearing site/browser data can erase local records. Use **Settings → Export backup** periodically.
+
+## Project roadmap
+
+See [`PROJECT_NOTES.md`](./PROJECT_NOTES.md).
