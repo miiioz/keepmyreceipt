@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#fff1f6" />
+  <meta name="theme-color" content="#eee6e8" />
   <meta name="description" content="Keep receipts, return dates and warranties together. Your data stays on your device." />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -28,11 +28,15 @@
 
     <main>
       <section class="view active" id="homeView" data-view="home">
-        <div class="welcome-card">
-          <h1>Capture a purchase</h1>
-          <button class="primary wide" data-action="add">＋ Scan or add receipt</button>
-          <button class="secondary wide quick-entry" id="quickEntry">Quick note or dictation</button>
-        </div>
+        <section class="capture-overview" aria-labelledby="captureHeading">
+          <div class="welcome-card">
+            <h1 id="captureHeading">Capture a<br />purchase</h1>
+            <button class="primary" data-action="add">＋ Add receipt</button>
+          </div>
+          <button class="secondary quick-entry" id="quickEntry">
+            <span>Quick note or dictation</span><span aria-hidden="true">↗</span>
+          </button>
+        </section>
 
         <div class="stats">
           <button class="stat" data-filter-target="returns">
