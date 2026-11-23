@@ -113,3 +113,70 @@ dialog { color: var(--ink); background: #faf4f6; }
   outline: 2px solid #9b6a80;
   outline-offset: 2px;
 }
+
+/* Receipt illustration stays in its own column at narrow widths. */
+.welcome-card {
+  grid-template-columns: minmax(0, 1fr) minmax(76px, 34%);
+  column-gap: 8px;
+}
+.welcome-card h1 { grid-column: 1; grid-row: 1; }
+.welcome-card .primary { grid-column: 1; grid-row: 2; }
+.receipt-art {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  justify-self: center;
+  width: min(100%, 160px);
+  aspect-ratio: 1;
+  pointer-events: none;
+}
+.receipt-art span { position: absolute; }
+.receipt-art-halo {
+  inset: 8% 1% 4% 2%;
+  border-radius: 50%;
+  background: #785a67;
+}
+.receipt-art-back {
+  inset: 14% 27% 14% 12%;
+  border-radius: 8px;
+  background: #997583;
+  transform: rotate(-22deg);
+}
+.receipt-art-paper {
+  inset: 7% 15% 11% 25%;
+  border-radius: 8px 8px 0 0;
+  background: #d8b9c3;
+  transform: rotate(13deg);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 88% 94%, 75% 100%, 63% 94%, 50% 100%, 38% 94%, 25% 100%, 13% 94%, 0 100%);
+}
+.receipt-art-paper::before {
+  content: "";
+  position: absolute;
+  inset: 19% 19% 30%;
+  background:
+    linear-gradient(#72525f 0 0) left 0 / 65% 8% no-repeat,
+    linear-gradient(#a5818e 0 0) left 45% / 100% 6% no-repeat,
+    linear-gradient(#a5818e 0 0) left 65% / 83% 6% no-repeat,
+    linear-gradient(#a5818e 0 0) left 85% / 94% 6% no-repeat;
+}
+.receipt-art-check {
+  right: 2%;
+  bottom: 8%;
+  width: 31%;
+  aspect-ratio: 1;
+  border: 2px solid #e4c8d1;
+  border-radius: 50%;
+  background: #896271;
+}
+.receipt-art-check::before {
+  content: "";
+  position: absolute;
+  inset: 26% 27% 35% 28%;
+  border: solid #f9eef1;
+  border-width: 0 0 2px 2px;
+  transform: rotate(-45deg);
+}
+@media (max-width: 360px) {
+  .welcome-card h1 { font-size: 34px; }
+}
