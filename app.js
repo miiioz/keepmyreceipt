@@ -1,3 +1,5 @@
+import { calendarEvent, matchingPurchases, purchaseDraft } from "./capture.mjs";
+
 const DB_NAME = "keepmyreceipt-db";
 const DB_VERSION = 1;
 const STORE = "purchases";
@@ -6,7 +8,25 @@ const $ = (id) => document.getElementById(id);
 const els = { homeView: $("homeView"), receiptsView: $("receiptsView"), settingsView: $("settingsView"), recentList: $("recentList"), receiptList: $("receiptList"), searchInput: $("searchInput"), filterChips: $("filterChips"), savedCount: $("savedCount"), returnsCount: $("returnsCount"), warrantyCount: $("warrantyCount"), dialog: $("purchaseDialog"), form: $("purchaseForm"), formTitle: $("formTitle"), closeDialog: $("closeDialog"), deleteBtn: $("deleteBtn"), saveBtn: $("saveBtn"), receiptInput: $("receiptInput"), receiptLabel: $("receiptLabel"), receiptPreview: $("receiptPreview"), itemName: $("itemName"), retailer: $("retailer"), category: $("category"), currency: $("currency"), amount: $("amount"), purchaseDate: $("purchaseDate"), returnDays: $("returnDays"), warrantyMonths: $("warrantyMonths"), serialNumber: $("serialNumber"), notes: $("notes"), returnHint: $("returnHint"), warrantyHint: $("warrantyHint"), backupBtn: $("backupBtn"), restoreInput: $("restoreInput"), toast: $("toast"), settingsShortcut: $("settingsShortcut") };
 function openDb(){return new Promise((resolve,reject)=>{const request=indexedDB.open(DB_NAME,DB_VERSION);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:"id"})};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})}
 async function getAllPurchases(){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,"readonly");const req=tx.objectStore(STORE).getAll();req.onsuccess=()=>resolve(req.result||[]);req.onerror=()=>reject(req.error)})}
-async function putPurchase(purchase){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).put(purchase);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
+async function putPurchase(purchase, attaching) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE, "readwrite");
+    const store = transaction.objectStore(STORE);
+    transaction.oncomplete = () => { db.close(); resolve(); };
+    transaction.onabort = () => { db.close(); reject(transaction.error || new Error("Purchase changed")); };
+    if (attaching) {
+      const request = store.get(purchase.id);
+      request.onsuccess = () => {
+        const current = request.result;
+        if (!current || current.receiptBlob) transaction.abort();
+        else store.put(purchase);
+      };
+    } else {
+      store.put(purchase);
+    }
+  });
+}
 async function removePurchase(id){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");tx.objectStore(STORE).delete(id);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
 async function replaceAllPurchases(records){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,"readwrite");const store=tx.objectStore(STORE);store.clear();for(const record of records)store.put(record);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
 function addDays(dateString,days){if(!dateString||!Number(days))return null;const d=new Date(`${dateString}T12:00:00`);d.setDate(d.getDate()+Number(days));return d}
@@ -20,22 +40,270 @@ function matchesFilter(p,filter){const r=daysFromNow(addDays(p.purchaseDate,p.re
 function thumbHtml(p){if(p.receiptBlob&&p.receiptType?.startsWith("image/")){const url=URL.createObjectURL(p.receiptBlob);setTimeout(()=>URL.revokeObjectURL(url),60000);return `<div class="thumb"><img src="${url}" alt=""></div>`}if(p.receiptBlob&&p.receiptType==="application/pdf")return `<div class="thumb">PDF</div>`;return `<div class="thumb">▤</div>`}
 function cardHtml(p){const badges=getBadges(p).map(b=>`<span class="pill ${b.cls}">${escapeHtml(b.text)}</span>`).join("");return `<article class="purchase-card" data-id="${p.id}" role="button" tabindex="0">${thumbHtml(p)}<div class="card-main"><div class="card-top"><div class="card-title"><h3>${escapeHtml(p.itemName)}</h3><p>${escapeHtml(p.retailer||p.category||"Purchase")}</p></div><span class="price">${escapeHtml(formatMoney(p.amount,p.currency))}</span></div><div class="card-meta">${badges}</div></div></article>`}
 function emptyHtml(title,copy){return `<div class="empty"><strong>${escapeHtml(title)}</strong><p>${escapeHtml(copy)}</p></div>`}
-function render(){const sorted=[...state.purchases].sort((a,b)=>new Date(b.purchaseDate)-new Date(a.purchaseDate));els.savedCount.textContent=sorted.length;els.returnsCount.textContent=sorted.filter(p=>matchesFilter(p,"returns")).length;els.warrantyCount.textContent=sorted.filter(p=>matchesFilter(p,"warranties")).length;els.recentList.innerHTML=sorted.length?sorted.slice(0,4).map(cardHtml).join(""):emptyHtml("No receipts yet","Add your first purchase and KeepMyReceipt will track its return and warranty dates.");const q=state.query.trim().toLowerCase();const filtered=sorted.filter(p=>{const searchable=[p.itemName,p.retailer,p.category,p.serialNumber].filter(Boolean).join(" ").toLowerCase();return(!q||searchable.includes(q))&&matchesFilter(p,state.filter)});els.receiptList.innerHTML=filtered.length?filtered.map(cardHtml).join(""):emptyHtml(sorted.length?"No matching receipts":"No receipts yet",sorted.length?"Try another search or filter.":"Tap + to save your first receipt.");document.querySelectorAll(".purchase-card").forEach(card=>{const open=()=>openEditor(card.dataset.id);card.addEventListener("click",open);card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")open()})})}
+function render(){renderMemos();const sorted=state.purchases.filter(p=>p.kind!=="memo").sort((a,b)=>new Date(b.purchaseDate)-new Date(a.purchaseDate));els.savedCount.textContent=sorted.length;els.returnsCount.textContent=sorted.filter(p=>matchesFilter(p,"returns")).length;els.warrantyCount.textContent=sorted.filter(p=>matchesFilter(p,"warranties")).length;els.recentList.innerHTML=sorted.length?sorted.slice(0,4).map(cardHtml).join(""):emptyHtml("No receipts yet","Add your first purchase and KeepMyReceipt will track its return and warranty dates.");const q=state.query.trim().toLowerCase();const filtered=sorted.filter(p=>{const searchable=[p.itemName,p.retailer,p.category,p.serialNumber].filter(Boolean).join(" ").toLowerCase();return(!q||searchable.includes(q))&&matchesFilter(p,state.filter)});els.receiptList.innerHTML=filtered.length?filtered.map(cardHtml).join(""):emptyHtml(sorted.length?"No matching receipts":"No receipts yet",sorted.length?"Try another search or filter.":"Tap + to save your first receipt.");document.querySelectorAll(".purchase-card").forEach(card=>{const open=()=>openEditor(card.dataset.id);card.addEventListener("click",open);card.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" ")open()})})}
 function navigate(view){state.view=view;document.querySelectorAll(".view").forEach(el=>el.classList.toggle("active",el.dataset.view===view));document.querySelectorAll(".nav-item").forEach(el=>el.classList.toggle("active",el.dataset.nav===view));window.scrollTo({top:0,behavior:"smooth"})}
 function setFilter(filter){state.filter=filter;document.querySelectorAll(".chip").forEach(chip=>chip.classList.toggle("active",chip.dataset.filter===filter));navigate("receipts");render()}
-function todayString(){return new Date().toISOString().slice(0,10)}
-function resetForm(){state.editingId=null;state.receiptBlob=null;state.receiptName="";state.receiptType="";els.form.reset();els.purchaseDate.value=todayString();els.returnDays.value="30";els.warrantyMonths.value="12";els.category.value="Electronics";els.currency.value="NZD";els.receiptLabel.textContent="Take photo or choose receipt";els.receiptPreview.innerHTML="";els.receiptPreview.classList.add("hidden");els.formTitle.textContent="Add receipt";els.deleteBtn.classList.add("hidden");els.saveBtn.textContent="Save purchase";updateDateHints()}
-function fillForm(p){state.editingId=p.id;state.receiptBlob=p.receiptBlob||null;state.receiptName=p.receiptName||"";state.receiptType=p.receiptType||"";els.itemName.value=p.itemName||"";els.retailer.value=p.retailer||"";els.category.value=p.category||"Electronics";els.currency.value=p.currency||"NZD";els.amount.value=p.amount??"";els.purchaseDate.value=p.purchaseDate||todayString();els.returnDays.value=p.returnDays??0;els.warrantyMonths.value=p.warrantyMonths??0;els.serialNumber.value=p.serialNumber||"";els.notes.value=p.notes||"";els.receiptLabel.textContent=p.receiptName||"Take photo or choose receipt";showReceiptPreview();els.formTitle.textContent="Purchase details";els.deleteBtn.classList.remove("hidden");els.saveBtn.textContent="Save changes";updateDateHints()}
-function openNew(){resetForm();els.dialog.showModal()}
-function openEditor(id){const p=state.purchases.find(x=>x.id===id);if(!p)return;fillForm(p);els.dialog.showModal()}
+function todayString(){return localDate(new Date())}
+function resetForm(){state.editingId=null;state.receiptBlob=null;state.receiptName="";state.receiptType="";els.form.reset();els.purchaseDate.value=todayString();els.returnDays.value="30";els.warrantyMonths.value="12";els.category.value="Electronics";els.currency.value="NZD";els.receiptLabel.textContent="Choose receipt or screenshot";els.receiptPreview.innerHTML="";els.receiptPreview.classList.add("hidden");els.formTitle.textContent="Add receipt";els.deleteBtn.classList.add("hidden");els.saveBtn.textContent="Save purchase";resetCapture();updateDateHints()}
+function fillForm(p){state.editingId=p.id;state.receiptBlob=p.receiptBlob||null;state.receiptName=p.receiptName||"";state.receiptType=p.receiptType||"";els.itemName.value=p.itemName||"";els.retailer.value=p.retailer||"";els.category.value=p.category||"Electronics";els.currency.value=p.currency||"NZD";els.amount.value=p.amount??"";els.purchaseDate.value=p.purchaseDate||todayString();els.returnDays.value=p.returnDays??0;els.warrantyMonths.value=p.warrantyMonths??0;els.serialNumber.value=p.serialNumber||"";els.notes.value=p.notes||"";els.receiptLabel.textContent=p.receiptName||"Choose receipt or screenshot";showReceiptPreview();els.formTitle.textContent=p.kind==="memo"?"Memo details":"Purchase details";els.deleteBtn.classList.remove("hidden");els.saveBtn.textContent="Save changes";resetCapture(p);updateDateHints()}
+function openNew(){if(els.dialog.open)return;resetForm();els.dialog.showModal()}
+function openEditor(id){const p=state.purchases.find(x=>x.id===id);if(!p||els.dialog.open)return;fillForm(p);els.dialog.showModal()}
 function closeDialog(){if(els.dialog.open)els.dialog.close()}
 function updateDateHints(){const purchaseDate=els.purchaseDate.value;const returnDate=addDays(purchaseDate,els.returnDays.value);const warrantyDate=addMonths(purchaseDate,els.warrantyMonths.value);els.returnHint.textContent=returnDate?`Return by ${formatDate(returnDate)}`:"No return reminder";els.warrantyHint.textContent=warrantyDate?`Until ${formatDate(warrantyDate)}`:"No warranty reminder"}
 function showReceiptPreview(){els.receiptPreview.innerHTML="";if(!state.receiptBlob){els.receiptPreview.classList.add("hidden");return}els.receiptPreview.classList.remove("hidden");if(state.receiptType?.startsWith("image/")){const url=URL.createObjectURL(state.receiptBlob);const img=document.createElement("img");img.src=url;img.alt="Receipt preview";img.onload=()=>URL.revokeObjectURL(url);els.receiptPreview.appendChild(img)}else{els.receiptPreview.innerHTML=`<div class="pdf-preview">PDF · ${escapeHtml(state.receiptName)}</div>`}}
 function showToast(message){els.toast.textContent=message;els.toast.classList.add("show");clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>els.toast.classList.remove("show"),2200)}
 async function refresh(){state.purchases=await getAllPurchases();render()}
-async function saveForm(event){event.preventDefault();if(!els.itemName.value.trim()||!els.purchaseDate.value)return;const old=state.purchases.find(x=>x.id===state.editingId);const wasEditing=Boolean(state.editingId);const record={id:state.editingId||crypto.randomUUID(),itemName:els.itemName.value.trim(),retailer:els.retailer.value.trim(),category:els.category.value,currency:els.currency.value,amount:els.amount.value===""?"":Number(els.amount.value),purchaseDate:els.purchaseDate.value,returnDays:Number(els.returnDays.value)||0,warrantyMonths:Number(els.warrantyMonths.value)||0,serialNumber:els.serialNumber.value.trim(),notes:els.notes.value.trim(),receiptBlob:state.receiptBlob,receiptName:state.receiptName,receiptType:state.receiptType,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};await putPurchase(record);await refresh();closeDialog();showToast(wasEditing?"Purchase updated":"Receipt saved")}
+async function saveForm(event){event.preventDefault();if(!els.itemName.value.trim()||!els.purchaseDate.value)return;const old=state.purchases.find(x=>x.id===state.editingId);const wasEditing=Boolean(state.editingId);const record={kind:old?.kind,id:state.editingId||crypto.randomUUID(),itemName:els.itemName.value.trim(),retailer:els.retailer.value.trim(),category:els.category.value,currency:els.currency.value,amount:els.amount.value===""?"":Number(els.amount.value),purchaseDate:els.purchaseDate.value,returnDays:Number(els.returnDays.value)||0,warrantyMonths:Number(els.warrantyMonths.value)||0,serialNumber:els.serialNumber.value.trim(),notes:els.notes.value.trim(),reminderTitle:$("reminderTitle").value.trim(),reminderAt:$("reminderAt").value,receiptBlob:state.receiptBlob,receiptName:state.receiptName,receiptType:state.receiptType,createdAt:old?.createdAt||new Date().toISOString(),updatedAt:new Date().toISOString()};await putPurchase(record, attachingReceipt);await refresh();closeDialog();showToast(old?.kind==="memo"?"Memo updated":wasEditing?"Purchase updated":"Receipt saved")}
 function fileToBase64(blob){return new Promise((resolve,reject)=>{if(!blob)return resolve(null);const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsDataURL(blob)})}
 function base64ToBlob(dataUrl){if(!dataUrl)return null;const[meta,data]=dataUrl.split(",");const mime=meta.match(/data:(.*?);base64/)?.[1]||"application/octet-stream";const binary=atob(data);const bytes=new Uint8Array(binary.length);for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);return new Blob([bytes],{type:mime})}
 async function exportBackup(){try{const records=[];for(const p of state.purchases)records.push({...p,receiptBlob:await fileToBase64(p.receiptBlob)});const payload={app:"KeepMyReceipt",version:1,exportedAt:new Date().toISOString(),purchases:records};const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=`keepmyreceipt-backup-${todayString()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);showToast("Backup exported")}catch(error){console.error(error);showToast("Backup failed")}}
 async function importBackup(file){try{const payload=JSON.parse(await file.text());if(payload?.app!=="KeepMyReceipt"||!Array.isArray(payload.purchases))throw new Error("Invalid backup");if(!confirm(`Restore ${payload.purchases.length} purchases? This replaces the data currently on this device.`))return;const records=payload.purchases.map(p=>({...p,receiptBlob:typeof p.receiptBlob==="string"?base64ToBlob(p.receiptBlob):null}));await replaceAllPurchases(records);await refresh();showToast("Backup restored");navigate("home")}catch(error){console.error(error);showToast("Could not restore backup")}finally{els.restoreInput.value=""}}
-document.addEventListener("click",e=>{const nav=e.target.closest("[data-nav]");if(nav)navigate(nav.dataset.nav);const add=e.target.closest("[data-action='add']");if(add)openNew();const filterTarget=e.target.closest("[data-filter-target]");if(filterTarget)setFilter(filterTarget.dataset.filterTarget)});els.settingsShortcut.addEventListener("click",()=>navigate("settings"));els.filterChips.addEventListener("click",e=>{const chip=e.target.closest("[data-filter]");if(chip)setFilter(chip.dataset.filter)});els.searchInput.addEventListener("input",()=>{state.query=els.searchInput.value;render()});els.closeDialog.addEventListener("click",closeDialog);els.form.addEventListener("submit",saveForm);els.purchaseDate.addEventListener("change",updateDateHints);els.returnDays.addEventListener("input",updateDateHints);els.warrantyMonths.addEventListener("input",updateDateHints);els.receiptInput.addEventListener("change",e=>{const file=e.target.files?.[0];if(!file)return;state.receiptBlob=file;state.receiptName=file.name;state.receiptType=file.type;els.receiptLabel.textContent=file.name;showReceiptPreview()});els.deleteBtn.addEventListener("click",async()=>{if(!state.editingId)return;const p=state.purchases.find(x=>x.id===state.editingId);if(!confirm(`Delete “${p?.itemName||"this purchase"}”?`))return;await removePurchase(state.editingId);await refresh();closeDialog();showToast("Purchase deleted")});els.backupBtn.addEventListener("click",exportBackup);els.restoreInput.addEventListener("change",e=>{const file=e.target.files?.[0];if(file)importBackup(file)});els.dialog.addEventListener("click",e=>{const rect=els.dialog.getBoundingClientRect();const outside=e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom;if(outside)closeDialog()});if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(console.warn));refresh().catch(error=>{console.error(error);els.recentList.innerHTML=emptyHtml("Could not open local storage","Try reloading the page.");els.receiptList.innerHTML=els.recentList.innerHTML});
+document.addEventListener("click",e=>{const nav=e.target.closest("[data-nav]");if(nav)navigate(nav.dataset.nav);const add=e.target.closest("[data-action='add']");if(add)openNew();const filterTarget=e.target.closest("[data-filter-target]");if(filterTarget)setFilter(filterTarget.dataset.filterTarget)});els.settingsShortcut.addEventListener("click",()=>navigate("settings"));els.filterChips.addEventListener("click",e=>{const chip=e.target.closest("[data-filter]");if(chip)setFilter(chip.dataset.filter)});els.searchInput.addEventListener("input",()=>{state.query=els.searchInput.value;render()});els.closeDialog.addEventListener("click",closeDialog);els.form.addEventListener("submit", submitPurchase);els.purchaseDate.addEventListener("change",updateDateHints);els.returnDays.addEventListener("input",updateDateHints);els.warrantyMonths.addEventListener("input",updateDateHints);els.deleteBtn.addEventListener("click",async()=>{if(!state.editingId)return;const p=state.purchases.find(x=>x.id===state.editingId);if(!confirm(`Delete “${p?.itemName||"this purchase"}”?`))return;await removePurchase(state.editingId);await refresh();closeDialog();showToast("Purchase deleted")});els.backupBtn.addEventListener("click",exportBackup);els.restoreInput.addEventListener("change",e=>{const file=e.target.files?.[0];if(file)importBackup(file)});els.dialog.addEventListener("click",e=>{const rect=els.dialog.getBoundingClientRect();const outside=e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom;if(outside)closeDialog()});if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(console.warn));refresh().then(() => {
+  const params = new URLSearchParams(location.search);
+  if (params.has("purchase")) openEditor(params.get("purchase"));
+  if (params.has("quick") && !els.dialog.open) $("quickEntry").click();
+}).catch(error=>{console.error(error);els.recentList.innerHTML=emptyHtml("Could not open local storage","Try reloading the page.");els.receiptList.innerHTML=els.recentList.innerHTML});
+let captureVersion = 0;
+let attachingReceipt = false;
+let ocrModule;
+
+function localDate(date) {
+  return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+    .map(part => String(part).padStart(2, "0")).join("-");
+}
+
+function resetCapture(purchase) {
+  captureVersion++;
+  attachingReceipt = false;
+  $("scanReceipt").disabled = false;
+  $("scanReceipt").classList.toggle("hidden", !state.receiptType.startsWith("image/"));
+  $("cameraInput").value = "";
+  $("quickCapture").open = false;
+  $("saveMemo").classList.toggle("hidden", Boolean(purchase));
+  $("quickText").value = "";
+  $("captureStatus").textContent = "";
+  $("reminderTitle").value = purchase?.reminderTitle || "";
+  $("reminderAt").value = purchase?.reminderAt || "";
+  $("reminderPanel").open = Boolean(purchase?.reminderTitle || purchase?.reminderAt);
+  renderReceiptMatches();
+}
+
+function setReceipt(file) {
+  captureVersion++;
+  state.receiptBlob = file;
+  state.receiptName = file.name;
+  state.receiptType = file.type;
+  els.receiptLabel.textContent = file.name;
+  $("scanReceipt").disabled = false;
+  $("scanReceipt").classList.toggle("hidden", !file.type.startsWith("image/"));
+  $("captureStatus").textContent = "";
+  showReceiptPreview();
+  renderReceiptMatches();
+}
+
+function fillDraft(text, fromImage) {
+  const draft = purchaseDraft(text, fromImage);
+  if (draft.amount && !els.amount.value) {
+    els.amount.value = draft.amount;
+    els.currency.value = draft.currency;
+  }
+  if (draft.item && !els.itemName.value) els.itemName.value = draft.item;
+  if (draft.retailer && !els.retailer.value) els.retailer.value = draft.retailer;
+  if (!state.editingId && els.purchaseDate.value === todayString()) {
+    if (draft.date) {
+      const date = new Date(draft.date + "T12:00:00");
+      if (!Number.isNaN(date.getTime()) && localDate(date) === draft.date) els.purchaseDate.value = draft.date;
+    } else if (draft.yesterday) {
+      const date = new Date();
+      date.setDate(date.getDate() - 1);
+      els.purchaseDate.value = localDate(date);
+    }
+  }
+  updateDateHints();
+  renderReceiptMatches();
+}
+
+function renderReceiptMatches() {
+  const section = $("receiptMatches");
+  section.replaceChildren();
+  section.classList.add("hidden");
+  if (state.editingId || !state.receiptBlob) return;
+  const matches = matchingPurchases(state.purchases, els.amount.value, els.currency.value, els.purchaseDate.value);
+  if (!matches.length) return;
+  section.classList.remove("hidden");
+  const heading = document.createElement("p");
+  heading.textContent = "Same amount and date. Attach this receipt to an existing purchase?";
+  section.append(heading);
+  for (const purchase of matches) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary";
+    button.textContent = `Attach to ${purchase.itemName}${purchase.retailer ? ` · ${purchase.retailer}` : ""}`;
+    button.addEventListener("click", async () => {
+      const version = captureVersion;
+      const receipt = state.receiptBlob;
+      const name = state.receiptName;
+      const type = state.receiptType;
+      try {
+        const latest = (await getAllPurchases()).find(record => record.id === purchase.id);
+        if (version !== captureVersion || !els.dialog.open) return;
+        if (!latest || latest.receiptBlob) {
+          await refresh();
+          renderReceiptMatches();
+          showToast("Purchase changed. Choose again.");
+          return;
+        }
+        fillForm(latest);
+        attachingReceipt = true;
+        state.receiptBlob = receipt;
+        state.receiptType = type;
+        state.receiptName = name;
+        els.receiptLabel.textContent = name;
+        showReceiptPreview();
+        $("scanReceipt").classList.toggle("hidden", !type.startsWith("image/"));
+        $("captureStatus").textContent = "Receipt attached to this draft. Save changes to finish.";
+      } catch (error) {
+        console.error(error);
+        showToast("Could not load purchase");
+      }
+    });
+    section.append(button);
+  }
+}
+
+async function scanReceipt() {
+  const version = ++captureVersion;
+  const file = state.receiptBlob;
+  const button = $("scanReceipt");
+  const status = $("captureStatus");
+  button.disabled = true;
+  status.textContent = "Reading receipt on this device…";
+  let worker;
+  try {
+    ocrModule ??= import("https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.esm.min.js")
+      .catch(error => { ocrModule = undefined; throw error; });
+    const { createWorker } = await ocrModule;
+    worker = await createWorker("eng+chi_sim", 1, {
+      workerPath: "https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/worker.min.js",
+      corePath: "https://cdn.jsdelivr.net/npm/tesseract.js-core@6.0.0",
+      langPath: "https://tessdata.projectnaptha.com/4.0.0"
+    });
+    const { data } = await worker.recognize(file);
+    if (captureVersion !== version || !els.dialog.open) return;
+    fillDraft(data.text, true);
+    status.textContent = "Check the suggested total, store and date before saving.";
+  } catch (error) {
+    console.error(error);
+    if (captureVersion === version) status.textContent = "Could not read the image. Enter the details manually or try again while online.";
+  } finally {
+    if (worker) await worker.terminate().catch(console.warn);
+    if (captureVersion === version) button.disabled = false;
+  }
+}
+
+async function submitPurchase(event) {
+  event.preventDefault();
+  if (els.saveBtn.disabled || $("scanReceipt").disabled) return;
+  if (!state.editingId && !$("receiptMatches").classList.contains("hidden")
+      && !confirm("Save as a separate purchase? You can also attach this receipt to an existing purchase.")) return;
+  els.saveBtn.disabled = true;
+  try {
+    await saveForm(event);
+  } catch (error) {
+    console.error(error);
+    showToast("Could not save purchase");
+  } finally {
+    els.saveBtn.disabled = false;
+  }
+}
+
+$("quickEntry").addEventListener("click", () => {
+  openNew();
+  $("quickCapture").open = true;
+  $("quickText").focus();
+});
+$("fillQuickDraft").addEventListener("click", () => {
+  const text = $("quickText").value.trim();
+  if (!text) return;
+  if (/提醒|\bremind\b/i.test(text)) {
+    $("reminderTitle").value = text;
+    $("reminderPanel").open = true;
+    $("reminderAt").focus();
+  } else {
+    fillDraft(text, false);
+    if (!els.notes.value) els.notes.value = text;
+    $("captureStatus").textContent = "Check the draft and fill any missing details.";
+  }
+});
+for (const input of [els.receiptInput, $("cameraInput")]) {
+  input.addEventListener("change", () => {
+    if (input.files?.[0]) setReceipt(input.files[0]);
+    input.value = "";
+  });
+}
+for (const input of [els.amount, els.currency, els.purchaseDate]) {
+  input.addEventListener("input", renderReceiptMatches);
+}
+$("scanReceipt").addEventListener("click", scanReceipt);
+$("exportReminder").addEventListener("click", () => {
+  const date = new Date($("reminderAt").value);
+  if (Number.isNaN(date.getTime()) || date <= new Date()) {
+    showToast("Choose a future date and time");
+    $("reminderAt").focus();
+    return;
+  }
+  const title = $("reminderTitle").value.trim() || `Follow up: ${els.itemName.value.trim() || "purchase"}`;
+  const link = new URL(location.pathname, location.origin);
+  if (state.editingId) link.searchParams.set("purchase", state.editingId);
+  const description = [els.itemName.value, els.retailer.value, state.editingId ? link.href : ""].filter(Boolean).join("\n");
+  const event = calendarEvent(state.editingId || crypto.randomUUID(), title, date, description);
+  const url = URL.createObjectURL(new Blob([event], { type: "text/calendar" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = "keepmyreceipt-reminder.ics";
+  anchor.click();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+});
+
+function renderMemos() {
+  const section = $("memoSection");
+  const list = $("memoList");
+  const memos = state.purchases.filter(record => record.kind === "memo")
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  section.classList.toggle("hidden", !memos.length);
+  list.replaceChildren();
+  for (const memo of memos) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary wide memo-item";
+    button.textContent = memo.itemName;
+    button.addEventListener("click", () => openEditor(memo.id));
+    list.append(button);
+  }
+}
+
+$("saveMemo").addEventListener("click", async () => {
+  const note = $("quickText").value.trim();
+  if (!note || state.editingId) return;
+  const button = $("saveMemo");
+  if (button.disabled || els.saveBtn.disabled) return;
+  button.disabled = true;
+  els.saveBtn.disabled = true;
+  try {
+    const now = new Date().toISOString();
+    await putPurchase({
+      id: crypto.randomUUID(), kind: "memo", itemName: note, purchaseDate: todayString(),
+      returnDays: 0, warrantyMonths: 0, createdAt: now, updatedAt: now,
+      reminderTitle: $("reminderTitle").value.trim(), reminderAt: $("reminderAt").value
+    });
+    await refresh();
+    closeDialog();
+    showToast("Memo saved");
+  } catch (error) {
+    console.error(error);
+    showToast("Could not save memo");
+  } finally {
+    button.disabled = false;
+    els.saveBtn.disabled = false;
+  }
+});
