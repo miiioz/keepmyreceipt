@@ -34,6 +34,7 @@
           <h1>Receipts you can actually find.</h1>
           <p>Save receipts, return dates and warranties on this device.</p>
           <button class="primary wide" data-action="add">＋ Scan or add receipt</button>
+          <button class="secondary wide quick-entry" id="quickEntry">Quick note or dictation</button>
         </div>
 
         <div class="stats">
@@ -59,6 +60,10 @@
           <button class="text-btn" data-nav="receipts">See all</button>
         </div>
         <div id="recentList" class="card-list"></div>
+        <section id="memoSection" class="hidden">
+          <div class="section-head"><h2>Memos</h2></div>
+          <div id="memoList"></div>
+        </section>
       </section>
 
       <section class="view" id="receiptsView" data-view="receipts">
@@ -144,16 +149,35 @@
       </div>
 
       <div class="receipt-capture">
-        <input id="receiptInput" type="file" accept="image/*,application/pdf" capture="environment" />
+        <input id="receiptInput" type="file" accept="image/*,application/pdf" />
         <label for="receiptInput" class="capture-box">
           <span class="camera-icon">◎</span>
           <span>
-            <strong id="receiptLabel">Take photo or choose receipt</strong>
+            <strong id="receiptLabel">Choose receipt or screenshot</strong>
             <small>JPG, PNG or PDF · stored on this device</small>
           </span>
         </label>
+        <div class="capture-tools">
+          <input id="cameraInput" type="file" accept="image/*" capture="environment" />
+          <label for="cameraInput" class="secondary camera-action">Take photo</label>
+          <button id="scanReceipt" type="button" class="secondary hidden">Read receipt</button>
+        </div>
         <div id="receiptPreview" class="receipt-preview hidden"></div>
       </div>
+
+      <details id="quickCapture" class="capture-panel">
+        <summary>Quick note or dictation</summary>
+        <label class="field">
+          <span>Tap the microphone on your keyboard to dictate</span>
+          <textarea id="quickText" rows="2" placeholder="今天在 New World 花了 36 刀"></textarea>
+        </label>
+        <div class="capture-tools">
+          <button type="button" id="fillQuickDraft" class="secondary">Fill purchase details</button>
+          <button type="button" id="saveMemo" class="secondary">Save as memo</button>
+        </div>
+      </details>
+      <p id="captureStatus" class="capture-status" role="status"></p>
+      <section id="receiptMatches" class="capture-panel hidden" aria-label="Matching purchases"></section>
 
       <div class="form-grid">
         <label class="field full"><span>Item name *</span><input id="itemName" required placeholder="e.g. Dyson V10 Absolute" /></label>
@@ -168,6 +192,19 @@
         <label class="field full"><span>Notes</span><textarea id="notes" rows="3" placeholder="Accessories, extended cover, claim notes…"></textarea></label>
       </div>
 
+      <details class="capture-panel" id="reminderPanel">
+        <summary>Calendar reminder</summary>
+        <label class="field">
+          <span>Reminder title</span>
+          <input id="reminderTitle" placeholder="e.g. Return this item" />
+        </label>
+        <label class="field">
+          <span>Date and time</span>
+          <input id="reminderAt" type="datetime-local" />
+        </label>
+        <button type="button" id="exportReminder" class="secondary">Open calendar file</button>
+        <small>Import the event into your calendar to receive an alert. Save changes to keep the reminder details here.</small>
+      </details>
       <div class="sheet-actions">
         <button type="button" class="danger-link hidden" id="deleteBtn">Delete</button>
         <button type="submit" class="primary grow" id="saveBtn">Save purchase</button>

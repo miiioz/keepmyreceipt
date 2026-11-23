@@ -50,3 +50,10 @@ Clearing site/browser data can erase local records. Use **Settings → Export ba
 ## Project roadmap
 
 See [`PROJECT_NOTES.md`](./PROJECT_NOTES.md).
+
+## Quick capture on iPhone
+
+- Open **Quick note or dictation** and use the microphone on the iPhone keyboard. Try `今天在 New World 花了 36 刀`. Tap **Fill purchase details**, check the draft and save. For a standalone note, tap **Save as memo**. Memos appear on Home and are included in backups. A Shortcut with an **Open URLs** action can open `https://miiioz.github.io/keepmyreceipt/?quick=1` directly.
+- Use **Take photo** for paper receipts or **Choose receipt or screenshot** for images from Photos. Tap **Read receipt** to scan an image. English and simplified Chinese recognition runs in the browser. The recognition engine and language files download when needed. PDFs can still be saved as attachments.
+- If a receipt matches an existing purchase without a receipt by amount, currency and date, tap **Attach to …**, then **Save changes**. If the match is missing, open the original purchase and choose its receipt directly.
+- For a return reminder, save the purchase with a reminder title and date/time. Reopen it and use **Open calendar file** to export an event with an alert. Import the event into your calendar. Calendar links can open the associated purchase where the browser has access to the saved record.
