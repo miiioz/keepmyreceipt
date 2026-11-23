@@ -57,3 +57,14 @@ See [`PROJECT_NOTES.md`](./PROJECT_NOTES.md).
 - Use **Take photo** for paper receipts or **Choose receipt or screenshot** for images from Photos. Tap **Read receipt** to scan an image. English and simplified Chinese recognition runs in the browser. The recognition engine and language files download when needed. PDFs can still be saved as attachments.
 - If a receipt matches an existing purchase without a receipt by amount, currency and date, tap **Attach to …**, then **Save changes**. If the match is missing, open the original purchase and choose its receipt directly.
 - For a return reminder, save the purchase with a reminder title and date/time. Reopen it and use **Open calendar file** to export an event with an alert. Import the event into your calendar. Calendar links can open the associated purchase where the browser has access to the saved record.
+
+
+### Dictate a purchase from Apple Shortcuts
+
+Create a shortcut named **记一笔消费** with these actions:
+
+1. **Dictate Text**. Choose your preferred language.
+2. **URL Encode** the dictated text.
+3. **Open URLs** using `https://miiioz.github.io/keepmyreceipt/#expense=` followed immediately by the URL Encode result.
+
+Say “Siri，记一笔消费” and dictate the purchase. The browser opens a draft for confirmation. Use the same browser for subsequent purchases. The transcript is passed in the URL fragment, which is excluded from the web request, then removed from the address bar when the draft opens. For notes and appointments, separate shortcuts can use Apple Notes and Calendar actions directly.

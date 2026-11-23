@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#111827" />
+  <meta name="theme-color" content="#fff1f6" />
   <meta name="description" content="Keep receipts, return dates and warranties together. Your data stays on your device." />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -22,7 +22,6 @@
           <span class="brand-icon" aria-hidden="true">▤</span>
           <strong>KeepMyReceipt</strong>
         </div>
-        <p id="header-subtitle">Your purchase vault</p>
       </div>
       <button class="icon-btn" id="settingsShortcut" aria-label="Open settings">⚙</button>
     </header>
@@ -30,9 +29,7 @@
     <main>
       <section class="view active" id="homeView" data-view="home">
         <div class="welcome-card">
-          <span class="eyebrow">PRIVATE BY DEFAULT</span>
-          <h1>Receipts you can actually find.</h1>
-          <p>Save receipts, return dates and warranties on this device.</p>
+          <h1>Capture a purchase</h1>
           <button class="primary wide" data-action="add">＋ Scan or add receipt</button>
           <button class="secondary wide quick-entry" id="quickEntry">Quick note or dictation</button>
         </div>
@@ -54,7 +51,6 @@
 
         <div class="section-head">
           <div>
-            <span class="eyebrow">RECENT</span>
             <h2>Latest purchases</h2>
           </div>
           <button class="text-btn" data-nav="receipts">See all</button>
@@ -68,7 +64,6 @@
 
       <section class="view" id="receiptsView" data-view="receipts">
         <div class="page-title">
-          <span class="eyebrow">LIBRARY</span>
           <h1>Your receipts</h1>
         </div>
         <div class="search-box">
@@ -86,8 +81,7 @@
 
       <section class="view" id="settingsView" data-view="settings">
         <div class="page-title">
-          <span class="eyebrow">SETTINGS</span>
-          <h1>Keep your vault safe</h1>
+          <h1>Settings</h1>
         </div>
 
         <div class="settings-card">
@@ -142,7 +136,6 @@
       <div class="sheet-handle"></div>
       <div class="sheet-header">
         <div>
-          <span class="eyebrow">PURCHASE</span>
           <h2 id="formTitle">Add receipt</h2>
         </div>
         <button class="icon-btn close-btn" type="button" id="closeDialog" aria-label="Close">×</button>
