@@ -61,7 +61,7 @@ async function importBackup(file){try{const payload=JSON.parse(await file.text()
 document.addEventListener("click",e=>{const nav=e.target.closest("[data-nav]");if(nav)navigate(nav.dataset.nav);const add=e.target.closest("[data-action='add']");if(add)openNew();const filterTarget=e.target.closest("[data-filter-target]");if(filterTarget)setFilter(filterTarget.dataset.filterTarget)});els.settingsShortcut.addEventListener("click",()=>navigate("settings"));els.filterChips.addEventListener("click",e=>{const chip=e.target.closest("[data-filter]");if(chip)setFilter(chip.dataset.filter)});els.searchInput.addEventListener("input",()=>{state.query=els.searchInput.value;render()});els.closeDialog.addEventListener("click",closeDialog);els.form.addEventListener("submit", submitPurchase);els.purchaseDate.addEventListener("change",updateDateHints);els.returnDays.addEventListener("input",updateDateHints);els.warrantyMonths.addEventListener("input",updateDateHints);els.deleteBtn.addEventListener("click",async()=>{if(!state.editingId)return;const p=state.purchases.find(x=>x.id===state.editingId);if(!confirm(`Delete “${p?.itemName||"this purchase"}”?`))return;await removePurchase(state.editingId);await refresh();closeDialog();showToast("Purchase deleted")});els.backupBtn.addEventListener("click",exportBackup);els.restoreInput.addEventListener("change",e=>{const file=e.target.files?.[0];if(file)importBackup(file)});els.dialog.addEventListener("click",e=>{const rect=els.dialog.getBoundingClientRect();const outside=e.clientX<rect.left||e.clientX>rect.right||e.clientY<rect.top||e.clientY>rect.bottom;if(outside)closeDialog()});if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(console.warn));refresh().then(() => {
   const params = new URLSearchParams(location.search);
   if (params.has("purchase")) openEditor(params.get("purchase"));
-  if (params.has("quick") && !els.dialog.open) $("quickEntry").click();
+  if (!openDictatedPurchase() && params.has("quick") && !els.dialog.open) $("quickEntry").click();
 }).catch(error=>{console.error(error);els.recentList.innerHTML=emptyHtml("Could not open local storage","Try reloading the page.");els.receiptList.innerHTML=els.recentList.innerHTML});
 let captureVersion = 0;
 let attachingReceipt = false;
@@ -307,3 +307,23 @@ $("saveMemo").addEventListener("click", async () => {
     els.saveBtn.disabled = false;
   }
 });
+
+function openDictatedPurchase() {
+  const text = new URLSearchParams(location.hash.slice(1)).get("expense")?.trim();
+  if (!text) return false;
+  if (els.dialog.open) {
+    showToast("Close the current draft to import the dictated purchase.");
+    return true;
+  }
+  history.replaceState(history.state, "", location.pathname + location.search);
+  openNew();
+  $("quickCapture").open = true;
+  $("quickText").value = text;
+  fillDraft(text, false);
+  els.notes.value = text;
+  $("captureStatus").textContent = "Check the dictated purchase before saving.";
+  return true;
+}
+
+window.addEventListener("hashchange", openDictatedPurchase);
+els.dialog.addEventListener("close", openDictatedPurchase);
